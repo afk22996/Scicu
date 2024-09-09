@@ -28,7 +28,7 @@ def asimp(f, a, b, error):
 	return _asimp(f, a, fa, b, fb, error, whole, m ,fm)
 
 
-def G25(f, a, b):
+def G25(f, a, b, args = ()):
 	gauss = [(0,1.231760537267154512039028730790501e-01),(1.228646926107103963873598188080368e-01,1.222424429903100416889595189458515e-01),
 	(2.438668837209884320451903627974516e-01,1.194557635357847722281781265129010e-01),(3.611723058093878377358217301276407e-01,1.148582591457116483393255458695558e-01), 
 	(4.730027314457149605221821150091920e-01,1.085196244742636531160939570501166e-01),(5.776629302412229677236898416126541e-01,1.005359490670506442022068903926858e-01),
@@ -44,12 +44,12 @@ def G25(f, a, b):
 		w = gauss[i][1]
 		wi = sw(w)
 		if(y == 0):
-			gsum += wi*f(sx(y))
+			gsum += wi*f(sx(y), *args)
 		else:
-			gsum += wi*(f(sx(-y)) + f(sx(y)))
+			gsum += wi*(f(sx(-y), *args) + f(sx(y), *args))
 	return gsum
 
-def K51(f, a, b):
+def K51(f, a, b, args = ()):
 	kronrod = [(0,6.158081806783293507875982424006455e-02),(6.154448300568507888654639236679663e-02,6.147118987142531666154413196526418e-02),
 	(1.228646926107103963873598188080368e-01,6.112850971705304830585903041629271e-02),(1.837189394210488920159698887595284e-01,6.053945537604586294536026751756543e-02),
 	(2.438668837209884320451903627974516e-01,5.972034032417405997909929193256185e-02),(3.030895389311078301674789099803393e-01,5.868968002239420796197417585678776e-02),
@@ -72,50 +72,51 @@ def K51(f, a, b):
 		w = kronrod[i][1]
 		wi = sw(w)
 		if(y == 0):
-			ksum += wi*f(sx(y))
+			ksum += wi*f(sx(y), *args)
 		else:
-			ksum += wi*(f(sx(-y)) + f(sx(y)))
+			ksum += wi*(f(sx(-y), *args) + f(sx(y), *args))
 	return ksum
 
-def aK51(f, a, b, error):
-	g = G25(f, a, b)
-	k = K51(f, a, b)
+def aK51(f, a, b, args = (), error = 1e-8):
+	g = G25(f, a, b, args)
+	k = K51(f, a, b, args)
 	if(np.abs(k-g) < error):
 		return k
 	else:
 		m = (a + b)/2
-		return aK51(f, a, m, error/2) + aK51(f, m, b, error/2)
+		return aK51(f, a, m, args, error/2) + aK51(f, m, b, args, error/2)
 
-def quad(f, a, b, error):
+def quad(f, a, b, args = (), error = 1e-8):
 	if(b < a):
-		return -quad(f, b, a, error)
+		return -quad(f, b, a, args, error)
 	if(a == -np.infty):
 		if(b == np.infty):
-			ft = lambda t: f(t/(1-t**2))*(1+t**2)/(1-t**2)**2
-			return aK51(ft, -1, 1, error)
+			ft = lambda t: f(t/(1-t**2), *args)*(1+t**2)/(1-t**2)**2
+			return aK51(ft, -1, 1, args, error)
 		else:
-			ft = lambda t: f(a - (1-t)/t)/t**2
-			return aK51(ft, 0, 1, error)
+			ft = lambda t: f(a - (1-t)/t, *args)/t**2
+			return aK51(ft, 0, 1, args, error)
 	elif(b == np.infty):
-		ft = lambda t: f(a + (t/(1-t)))/((1-t)**2)
-		return aK51(ft, 0, 1, error)
+		ft = lambda t: f(a + (t/(1-t)), *args)/((1-t)**2)
+		return aK51(ft, 0, 1, args, error)
 	else:
-		return aK51(f, a, b, error)
+		return aK51(f, a, b, args, error)
 
 if __name__ == '__main__':
-	def f(x):
-		return np.exp(-x**2)
-	def F(x):
-		return -0.5*np.cos(x)**2
-	error = 1e-4
+	def f(x, a, b):
+		return a*np.sin(x) + b*np.cos(x)
+	def F(x, a, b):
+		return -a*np.cos(x) + b*np.sin(x)
+	error = 1e-6
 	x0 = 1
 	x1 = 10
-	actual = 0.1394027926403309882496163055387195
+	args = (1,2)
+	actual = F(x1, *args) - F(x0, *args)
 	t0 = time()
-	sint = integrate.quad(f, x0, x1, epsabs = error)[0]
+	sint = integrate.quad(f, x0, x1, args, epsabs = error)[0]
 	t1 = time()
 	print("Scipy Integral Error: %.15e\nIn Time: %.15es" %(abs(actual - sint), t1 - t0))
 	t0 = time()
-	myint = K51(f, x0, x1)
+	myint = quad(f, x0, x1, args, error)
 	t1 = time()
 	print("My Integral Error: %.15e\nIn Time: %.15es" %(abs(actual - myint), t1 - t0))
