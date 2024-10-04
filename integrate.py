@@ -77,30 +77,34 @@ def K51(f, a, b, args = ()):
 			ksum += wi*(f(sx(-y), *args) + f(sx(y), *args))
 	return ksum
 
-def aK51(f, a, b, args = (), error = 1e-8):
+def aK51(f, a, b, args = (), epsabs = 1.49e-8, epsrel = 1.49e-9, limit = 50):
+	global _subdivisions
 	g = G25(f, a, b, args)
 	k = K51(f, a, b, args)
-	if(np.abs(k-g) < error):
+	if(np.abs(k-g) <= max(epsabs, epsrel*abs(g)) or _subdivisions >= limit):
 		return k
 	else:
+		_subdivisions += 1
 		m = (a + b)/2
-		return aK51(f, a, m, args, error/2) + aK51(f, m, b, args, error/2)
+		return aK51(f, a, m, args, epsabs/2, epsrel/2, limit) + aK51(f, m, b, args, epsabs/2, epsrel/2, limit)
 
-def quad(f, a, b, args = (), error = 1e-8):
+def quad(f, a, b, args = (), epsabs = 1.49e-8, epsrel = 1.49e-9, limit = 50):
+	global _subdivisions
+	_subdivisions = 0
 	if(b < a):
-		return -quad(f, b, a, args, error)
+		return -quad(f, b, a, args, epsabs, epsrel, limit)
 	if(a == -np.infty):
 		if(b == np.infty):
 			ft = lambda t: f(t/(1-t**2), *args)*(1+t**2)/(1-t**2)**2
-			return aK51(ft, -1, 1, args, error)
+			return aK51(ft, -1, 1, args, epsabs, epsrel, limit)
 		else:
 			ft = lambda t: f(a - (1-t)/t, *args)/t**2
-			return aK51(ft, 0, 1, args, error)
+			return aK51(ft, 0, 1, args, epsabs, epsrel, limit)
 	elif(b == np.infty):
 		ft = lambda t: f(a + (t/(1-t)), *args)/((1-t)**2)
-		return aK51(ft, 0, 1, args, error)
+		return aK51(ft, 0, 1, args, epsabs, epsrel, limit)
 	else:
-		return aK51(f, a, b, args, error)
+		return aK51(f, a, b, args, epsabs, epsrel, limit)
 
 if __name__ == '__main__':
 	def f(x, a, b):
@@ -113,10 +117,10 @@ if __name__ == '__main__':
 	args = (1,2)
 	actual = F(x1, *args) - F(x0, *args)
 	t0 = time()
-	sint = integrate.quad(f, x0, x1, args, epsabs = error)[0]
+	sint = integrate.quad(f, x0, x1, args, epsabs = 1e-10, epsrel = 1e-10)[0]
 	t1 = time()
-	print("Scipy Integral Error: %.15e\nIn Time: %.15es" %(abs(actual - sint), t1 - t0))
+	print("Scipy Integral Error: %.15e\nIn Time: %.15es" %(abs(actual - sint)/abs(actual), t1 - t0))
 	t0 = time()
-	myint = quad(f, x0, x1, args, error)
+	myint = quad(f, x0, x1, args, 1e-16, 1e-16, 0)
 	t1 = time()
-	print("My Integral Error: %.15e\nIn Time: %.15es" %(abs(actual - myint), t1 - t0))
+	print("My Integral Error: %.15e\nIn Time: %.15es\nWith %d subdivisions" %(abs(actual - myint)/abs(actual), t1 - t0, _subdivisions))
