@@ -77,50 +77,65 @@ def K51(f, a, b, args = ()):
 			ksum += wi*(f(sx(-y), *args) + f(sx(y), *args))
 	return ksum
 
-def aK51(f, a, b, args = (), epsabs = 1.49e-8, epsrel = 1.49e-9, limit = 50):
+def aK51(f, a, b, args = (), epsabs = 1.49e-8, epsrel = 1.49e-9, limit = 50, points = []):
 	global _subdivisions
-	g = G25(f, a, b, args)
-	k = K51(f, a, b, args)
-	if(np.abs(k-g) <= max(epsabs, epsrel*abs(g)) or _subdivisions >= limit):
-		return k
-	else:
-		_subdivisions += 1
-		m = (a + b)/2
-		return aK51(f, a, m, args, epsabs/2, epsrel/2, limit) + aK51(f, m, b, args, epsabs/2, epsrel/2, limit)
+	if points == []:
+		points = [a,b]
+	elif(a not in points):
+		points.insert(0, a)
+	elif(b not in points):
+		points.append(b)
+	for i in range(len(points) - 1):
+		l = points[i]
+		r = points[i+1]
+		g = G25(f, l, r, args)
+		k = K51(f, l, r, args)
+		if(np.abs(k-g) <= max(epsabs, epsrel*abs(g)) or _subdivisions >= limit):
+			return k
+		else:
+			_subdivisions += 1
+			m = (a + b)/2
+			pointsl = []
+			pointsr = []
+			for point in points:
+				if point <= m:
+					pointsl.append(point)
+				elif point >= m:
+					pointsr.append(point)
+			return aK51(f, a, m, args, epsabs/2, epsrel/2, limit, pointsl) + aK51(f, m, b, args, epsabs/2, epsrel/2, limit, pointsr)
 
-def quad(f, a, b, args = (), epsabs = 1.49e-8, epsrel = 1.49e-9, limit = 50):
+def quad(f, a, b, args = (), epsabs = 1.49e-8, epsrel = 1.49e-9, limit = 50, points = []):
 	global _subdivisions
 	_subdivisions = 0
 	if(b < a):
-		return -quad(f, b, a, args, epsabs, epsrel, limit)
+		return -quad(f, b, a, args, epsabs, epsrel, limit, points)
 	if(a == -np.infty):
 		if(b == np.infty):
+			for i in range(len(points)):
+				points[i] = points[i]/(1-points[i]**2)
 			ft = lambda t: f(t/(1-t**2), *args)*(1+t**2)/(1-t**2)**2
-			return aK51(ft, -1, 1, args, epsabs, epsrel, limit)
+			return aK51(ft, -1, 1, args, epsabs, epsrel, limit, points)
 		else:
+			for i in range(len(points)):
+				points[i] = a - (1-points[i])/points[i]
 			ft = lambda t: f(a - (1-t)/t, *args)/t**2
-			return aK51(ft, 0, 1, args, epsabs, epsrel, limit)
+			return aK51(ft, 0, 1, args, epsabs, epsrel, limit, points)
 	elif(b == np.infty):
+		for i in range(len(points)):
+			points[i] = a + (points[i]/(1 - points[i]))
 		ft = lambda t: f(a + (t/(1-t)), *args)/((1-t)**2)
-		return aK51(ft, 0, 1, args, epsabs, epsrel, limit)
+		return aK51(ft, 0, 1, args, epsabs, epsrel, limit, points)
 	else:
-		return aK51(f, a, b, args, epsabs, epsrel, limit)
+		return aK51(f, a, b, args, epsabs, epsrel, limit, points)
 
 if __name__ == '__main__':
-	def f(x, a, b):
-		return a*np.sin(x) + b*np.cos(x)
-	def F(x, a, b):
-		return -a*np.cos(x) + b*np.sin(x)
-	error = 1e-6
-	x0 = 1
+	from scipy import special
+	def f(x):
+		return np.exp(-(x**2))
+	error = 1e-10
+	x0 = 0
 	x1 = 10
-	args = (1,2)
-	actual = F(x1, *args) - F(x0, *args)
-	t0 = time()
-	sint = integrate.quad(f, x0, x1, args, epsabs = 1e-10, epsrel = 1e-10)[0]
-	t1 = time()
-	print("Scipy Integral Error: %.15e\nIn Time: %.15es" %(abs(actual - sint)/abs(actual), t1 - t0))
-	t0 = time()
-	myint = quad(f, x0, x1, args, 1e-16, 1e-16, 0)
-	t1 = time()
-	print("My Integral Error: %.15e\nIn Time: %.15es\nWith %d subdivisions" %(abs(actual - myint)/abs(actual), t1 - t0, _subdivisions))
+	points = [5]
+	myint = quad(f, x0, x1, epsabs = 0, epsrel = error, points = points)
+	actual = 0.5*np.sqrt(np.pi)*special.erf(10)
+	print(abs(actual - myint)/abs(actual))
